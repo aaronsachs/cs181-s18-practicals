@@ -118,6 +118,8 @@ def extract_feats(ffs, direc="train", global_feat_dict=None):
         # accumulate features
         [rowfd.update(ff(tree)) for ff in ffs]
         fds.append(rowfd)
+
+        #print fds
         
     X,feat_dict = make_design_mat(fds,global_feat_dict)
     return X, feat_dict, np.array(classes), ids
@@ -228,6 +230,22 @@ def system_call_count_feats(tree):
             c['num_system_calls'] += 1
     return c
 
+#returns a dictionary with key as name of system call and value as the frequency of the system call
+def frequency(tree):
+    c = Counter()
+    in_all_section = False
+    for el in tree.iter():
+        # ignore everything outside the "all_section" element
+        if el.tag == "all_section" and not in_all_section:
+            in_all_section = True
+        elif el.tag == "all_section" and in_all_section:
+            in_all_section = False
+        elif in_all_section:
+            c[el.tag] += 1
+    return c
+
+
+
 ## The following function does the feature extraction, learning, and prediction
 def main():
     train_dir = "train"
@@ -235,11 +253,15 @@ def main():
     outputfile = "sample_predictions.csv"  # feel free to change this or take it as an argument
     
     # TODO put the names of the feature functions you've defined above in this list
-    ffs = [first_last_system_call_feats, system_call_count_feats]
+    ffs = [first_last_system_call_feats, system_call_count_feats,frequency]
     
     # extract features
     print "extracting training features..."
     X_train,global_feat_dict,t_train,train_ids = extract_feats(ffs, train_dir)
+
+    print X_train
+    print global_feat_dict
+
     print "done extracting training features"
     print
     
