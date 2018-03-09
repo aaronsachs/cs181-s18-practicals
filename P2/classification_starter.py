@@ -77,7 +77,7 @@ import numpy as np
 from scipy import sparse
 
 import util
-
+from sklearn.ensemble import RandomForestClassifier
 
 def extract_feats(ffs, direc="train", global_feat_dict=None):
     """
@@ -233,6 +233,7 @@ def system_call_count_feats(tree):
 #returns a dictionary with key as name of system call and value as the frequency of the system call
 def frequency(tree):
     c = Counter()
+    total=0
     in_all_section = False
     for el in tree.iter():
         # ignore everything outside the "all_section" element
@@ -242,8 +243,12 @@ def frequency(tree):
             in_all_section = False
         elif in_all_section:
             c[el.tag] += 1
-    return c
+            total+=1
 
+    for key in c.keys():
+        c[key] = c[key]/(total*1.0)
+
+    return c
 
 
 ## The following function does the feature extraction, learning, and prediction
@@ -259,22 +264,22 @@ def main():
     print "extracting training features..."
     X_train,global_feat_dict,t_train,train_ids = extract_feats(ffs, train_dir)
 
-    print X_train
-    print global_feat_dict
+    #print X_train
+    #print global_feat_dict
 
     print "done extracting training features"
     print
     
     # TODO train here, and learn your classification parameters
-    print "learning..."
-    learned_W = np.random.random((len(global_feat_dict),len(util.malware_classes)))
-    print "done learning"
-    print
+    #print "learning..."
+    #learned_W = np.random.random((len(global_feat_dict),len(util.malware_classes)))
+    #print "done learning"
+    #print
     
     # get rid of training data and load test data
-    del X_train
-    del t_train
-    del train_ids
+    # del X_train
+    # del t_train
+    # del train_ids
     print "extracting test features..."
     X_test,_,t_ignore,test_ids = extract_feats(ffs, test_dir, global_feat_dict=global_feat_dict)
     print "done extracting test features"
@@ -282,7 +287,9 @@ def main():
     
     # TODO make predictions on text data and write them out
     print "making predictions..."
-    preds = np.argmax(X_test.dot(learned_W),axis=1)
+    RF = RandomForestClassifier()
+    RF.fit(X_train,t_train)
+    preds = RF.predict(X_test)
     print "done making predictions"
     print
     
@@ -292,4 +299,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
