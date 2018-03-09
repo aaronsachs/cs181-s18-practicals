@@ -169,7 +169,9 @@ def make_design_mat(fds, global_feat_dict=None):
 
     assert len(cols) == len(rows) and len(rows) == len(data)
    
-
+    # Will be zero wherever a particular feature did not show up
+    # in one feature dict that did in another feature dict (because
+    # that feat won't have a row, col pair in cols and rows lists)
     X = sparse.csr_matrix((np.array(data),
                    (np.array(rows), np.array(cols))),
                    shape=(len(fds), len(feat_dict)))
@@ -253,7 +255,7 @@ def main():
     outputfile = "sample_predictions.csv"  # feel free to change this or take it as an argument
     
     # TODO put the names of the feature functions you've defined above in this list
-    ffs = [first_last_system_call_feats, system_call_count_feats,frequency]
+    ffs = [first_last_system_call_feats, system_call_count_feats, frequency]
     
     # extract features
     print "extracting training features..."
