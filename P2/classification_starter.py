@@ -237,7 +237,6 @@ def system_call_count_feats(tree):
 #returns a dictionary with key as name of system call and value as the frequency of the system call
 def frequency(tree):
     c = Counter()
-    total=0
     in_all_section = False
     for el in tree.iter():
         # ignore everything outside the "all_section" element
@@ -247,10 +246,7 @@ def frequency(tree):
             in_all_section = False
         elif in_all_section:
             c[el.tag] += 1
-            total+=1
-
-    for key in c.keys():
-        c[key] = c[key]/(total*1.0)
+    return c
 
 def trigrams(tree):
     c = Counter()
@@ -291,6 +287,8 @@ def main():
     print "extracting training features..."
     X_train,global_feat_dict,t_train,train_ids = extract_feats(ffs, train_dir)
 
+    # print X_train # Not currently a np.array, need to do .toarray()
+    # print global_feat_dict
 
     print "done extracting training features"
     print
@@ -332,3 +330,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
