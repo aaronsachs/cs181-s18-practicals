@@ -272,6 +272,33 @@ def trigrams(tree):
                 prev_elt = el.tag
     return c
 
+def quadgrams(tree):
+    c = Counter()
+    in_all_section = False
+    prev_elt = None
+    prev_prev_elt = None
+    prev_prev_prev_elt = None
+    for el in tree.iter():
+        # ignore everything outside the "all_section" element
+        if el.tag == "all_section" and not in_all_section:
+            in_all_section = True
+        elif el.tag == "all_section" and in_all_section:
+            in_all_section = False
+            prev_elt = None
+            prev_prev_elt = None # Reset trigrams for new section
+            prev_prev_prev_elt = None
+        elif in_all_section:
+            if prev_prev_elt == None:
+                prev_prev_elt = el.tag
+            elif prev_elt == None:
+                prev_elt = el.tag
+            else:
+                c[prev_prev_prev_elt + prev_prev_elt + prev_elt + el.tag] += 1
+                prev_prev_prev_elt = prev_prev_elt
+                prev_prev_elt = prev_elt
+                prev_elt = el.tag
+    return c
+
 
 ## The following function does the feature extraction, learning, and prediction
 def main():
@@ -281,7 +308,7 @@ def main():
     
     # TODO put the names of the feature functions you've defined above in this list
     # ffs = [first_last_system_call_feats, system_call_count_feats, frequency]
-    ffs = [trigrams]
+    ffs = [quadgrams]
     
     # extract features
     print "extracting training features..."

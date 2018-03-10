@@ -267,6 +267,26 @@ def frequency(tree):
             c[el.tag] += 1
     return c
 
+def bigrams(tree):
+    c = Counter()
+    in_all_section = False
+    prev_elt = None
+    for el in tree.iter():
+        # ignore everything outside the "all_section" element
+        if el.tag == "all_section" and not in_all_section:
+            in_all_section = True
+        elif el.tag == "all_section" and in_all_section:
+            in_all_section = False
+            prev_elt = None
+        elif in_all_section:
+            if prev_elt == None:
+                prev_elt = el.tag
+            else:
+                c[prev_elt + el.tag] += 1
+                prev_elt = el.tag
+    return c
+
+
 def trigrams(tree):
     c = Counter()
     in_all_section = False
@@ -291,6 +311,35 @@ def trigrams(tree):
                 prev_elt = el.tag
     return c
 
+def quadgrams(tree):
+    c = Counter()
+    in_all_section = False
+    prev_elt = None
+    prev_prev_elt = None
+    prev_prev_prev_elt = None
+    for el in tree.iter():
+        # ignore everything outside the "all_section" element
+        if el.tag == "all_section" and not in_all_section:
+            in_all_section = True
+        elif el.tag == "all_section" and in_all_section:
+            in_all_section = False
+            prev_elt = None
+            prev_prev_elt = None # Reset trigrams for new section
+            prev_prev_prev_elt = None
+        elif in_all_section:
+            if prev_prev_prev_elt == None:
+                prev_prev_prev_elt = el.tag
+            elif prev_prev_elt == None:
+                prev_prev_elt = el.tag
+            elif prev_elt == None:
+                prev_elt = el.tag
+            else:
+                c[prev_prev_prev_elt + prev_prev_elt + prev_elt + el.tag] += 1
+                prev_prev_prev_elt = prev_prev_elt
+                prev_prev_elt = prev_elt
+                prev_elt = el.tag
+    return c
+
 def accuracy(preds, actual):
     diff = preds - actual
     n = len(actual) * 1.0
@@ -304,7 +353,8 @@ def main():
     
     # TODO put the names of the feature functions you've defined above in this list
     # ffs = [first_last_system_call_feats, system_call_count_feats, frequency]
-    ffs = [trigrams]
+    # ffs = [bigrams, first_last_system_call_feats]
+    ffs = [first_last_system_call_feats, trigrams]
     
     # extract features
     print "extracting training features..."
@@ -329,8 +379,8 @@ def main():
     # # 10326 features, opt num feats was 2800.  Opt depth was 30
     # # 10326 features, opt num feats is 2750, opt depth is 28
 
-    # for depth in range(28, 33, 1):
-    #     for max_feat in tqdm(range(2750, 2900, 20)):
+    # for depth in range(200, 260, 10):
+    #     for max_feat in tqdm(range(250, 350, 10)):
     #         kscores = []
     #         for train_ind, test_ind in kfold.split(Xtrain):
     #             xtrain_cv = Xtrain[train_ind]
@@ -352,56 +402,54 @@ def main():
     
     # print("Best depth:", best_depth)
     # print("Best features", best_num_features)
-    rf = RandomForestClassifier(max_features = 2750, max_depth = 28)
+    rf = RandomForestClassifier(max_features = 300, max_depth = 220)
     rf.fit(Xtrain, Ytrain)
     preds = rf.predict(Xtest)
     print("RF:",  accuracy(preds, Ytest))
 
-    rf = RandomForestClassifier()
-    rf.fit(Xtrain, Ytrain)
-    preds = rf.predict(Xtest)
-    print("RF:",  accuracy(preds, Ytest))
+    # rf = RandomForestClassifier()
+    # rf.fit(Xtrain, Ytrain)
+    # preds = rf.predict(Xtest)
+    # print("RF:",  accuracy(preds, Ytest))
 
-    # nb = MultinomialNB(class_prior = [0.0369, 0.0162, 0.012, 0.0103, 0.0133, 0.0126, 0.0172, 0.0133, 0.5214, 0.0068, 0.1756, 0.0104, 0.1218, 0.0191, 0.0130])
-    # nb = MultinomialNB(class_prior = [1 for i in range(15)])
-    # nb = MultinomialNB(class_prior = [0.5] + [0.2] * 7 + [0.3] + [0.2] + [0.3] + [0.2] + [0.3] + [0.2] * 2) # Weight less common classes higher
-    nb = MultinomialNB()
+    nb = MultinomialNB(class_prior = [0.0369, 0.0162, 0.012, 0.0103, 0.0133, 0.0126, 0.0172, 0.0133, 0.5214, 0.0068, 0.1756, 0.0104, 0.1218, 0.0191, 0.0130])
+    # nb = MultinomialNB(class_prior = [0.2] * 8 + [0.3] + [0.2] + [0.3] + [0.2] + [0.3] + [0.2] * 2) # Weight less common classes higher
+    # nb = MultinomialNB()
     nb.fit(Xtrain, Ytrain)
     preds = nb.predict(Xtest)
     print("NB:",  accuracy(preds, Ytest))
 
     
-    # # NN CV: based on number neurons in one hidden layer
-    # # On 1000 rows, best number of nodes was 281
-    # print("Xtrain shape:", Xtrain.shape[1])
-    # best_num_nodes = None
-    # best_score = float("-inf")
-    # N = Xtrain.shape[0]
-    # kfold = KFold(n_splits = 5)
+    # NN CV: based on number neurons in one hidden layer
+    # On 1000 rows, best number of nodes was 281
+    print("Xtrain shape:", Xtrain.shape[1])
+    best_num_nodes = None
+    best_score = float("-inf")
+    N = Xtrain.shape[0]
+    kfold = KFold(n_splits = 5)
 
-    # for num_nodes in tqdm(range(1, (N * 2) // 3, 70)):
-    #     kscores = []
-    #     for train_ind, test_ind in kfold.split(Xtrain):
-    #         xtrain_cv = Xtrain[train_ind]
-    #         ytrain_cv = Ytrain[train_ind]
+    for num_nodes in tqdm(range(1, N // 2, 160)):
+        kscores = []
+        for train_ind, test_ind in kfold.split(Xtrain):
+            xtrain_cv = Xtrain[train_ind]
+            ytrain_cv = Ytrain[train_ind]
 
-    #         xtest_cv = Xtrain[test_ind]
-    #         ytest_cv = Ytrain[test_ind]
+            xtest_cv = Xtrain[test_ind]
+            ytest_cv = Ytrain[test_ind]
 
-    #         nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (num_nodes,))
-    #         nn.fit(xtrain_cv, ytrain_cv)
-    #         preds = nn.predict(xtest_cv)
-    #         kscores.append(accuracy(preds, ytest_cv))
+            nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (num_nodes,))
+            nn.fit(xtrain_cv, ytrain_cv)
+            preds = nn.predict(xtest_cv)
+            kscores.append(accuracy(preds, ytest_cv))
 
-    #     score = np.mean(kscores)
-    #     if score > best_score:
-    #         best_num_nodes = num_nodes
-    #         best_score = score
+        score = np.mean(kscores)
+        if score > best_score:
+            best_num_nodes = num_nodes
+            best_score = score
 
-    # print("best num nodes:",  best_num_nodes)
+    print("best num nodes:",  best_num_nodes)
 
-    
-    nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (281,))
+    nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (best_num_nodes,))
     nn.fit(Xtrain, Ytrain)
     preds = nn.predict(Xtest)
     print("NN:", accuracy(preds, Ytest))
