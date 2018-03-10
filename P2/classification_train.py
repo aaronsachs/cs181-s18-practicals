@@ -77,8 +77,13 @@ import numpy as np
 from scipy import sparse
 
 import util
+
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import KFold
+
+from tqdm import tqdm
 
 
 def extract_feats(ffs, direc="train", global_feat_dict=None):
@@ -102,7 +107,8 @@ def extract_feats(ffs, direc="train", global_feat_dict=None):
     fds = [] # list of feature dicts
     classes = []
     ids = []
-    for datafile in os.listdir(direc):
+    files_lst = os.listdir(direc)
+    for datafile in files_lst:
         # extract id and true class (if available) from filename
         id_str,clazz = datafile.split('.')[:2]
         ids.append(id_str)
@@ -122,9 +128,22 @@ def extract_feats(ffs, direc="train", global_feat_dict=None):
         fds.append(rowfd)
 
         #print fds
-        
+    
     X,feat_dict = make_design_mat(fds,global_feat_dict)
-    return X, feat_dict, np.array(classes), ids
+    
+    X = X.toarray(); N = X.shape[0]; train_inds = range(0, N / 2); test_inds = range(N / 2, N)
+    classes = np.array(classes)
+
+    train_info = [
+        X[train_inds], classes[train_inds], [ids[i] for i in train_inds]
+    ]
+
+    test_info = [
+        X[test_inds], classes[test_inds], [ids[i] for i in test_inds]
+    ]
+
+    # return X, feat_dict, np.array(classes), ids
+    return train_info, test_info
 
 
 def make_design_mat(fds, global_feat_dict=None):
@@ -237,7 +256,6 @@ def system_call_count_feats(tree):
 #returns a dictionary with key as name of system call and value as the frequency of the system call
 def frequency(tree):
     c = Counter()
-    total=0
     in_all_section = False
     for el in tree.iter():
         # ignore everything outside the "all_section" element
@@ -247,10 +265,7 @@ def frequency(tree):
             in_all_section = False
         elif in_all_section:
             c[el.tag] += 1
-            total+=1
-
-    for key in c.keys():
-        c[key] = c[key]/(total*1.0)
+    return c
 
 def trigrams(tree):
     c = Counter()
@@ -276,6 +291,10 @@ def trigrams(tree):
                 prev_elt = el.tag
     return c
 
+def accuracy(preds, actual):
+    diff = preds - actual
+    n = len(actual) * 1.0
+    return 1 - (np.count_nonzero(diff) / n)
 
 ## The following function does the feature extraction, learning, and prediction
 def main():
@@ -289,46 +308,137 @@ def main():
     
     # extract features
     print "extracting training features..."
-    X_train,global_feat_dict,t_train,train_ids = extract_feats(ffs, train_dir)
+    # X_train,global_feat_dict,t_train,train_ids = extract_feats(ffs, train_dir)
+    train_info, test_info = extract_feats(ffs, train_dir)
+    Xtrain, Ytrain, train_ids = train_info
+    Xtest, Ytest, test_ids = test_info
+    
+    # # Random Forest CV
+    # print("Xtrain shape:", Xtrain.shape[1])
+    # best_depth = None
+    # best_num_features = None
+    # best_score = float("-inf")
+    # tot_features = Xtrain.shape[1]
+    # kfold = KFold(n_splits = 5)
+    
+    # # On 1000 rows
+    # # First CV attempt: 7032 features, optimal num features was 2904.  Depth range 4, 16, 3: best was 13
+    # # Second CV attempt: 7032 features, optimal num features was 2600.  Depth range was 10, 30, 5: best was 20
+    # #
+    # # On all rows
+    # # 10326 features, opt num feats was 2800.  Opt depth was 30
+    # # 10326 features, opt num feats is 2750, opt depth is 28
 
+    # for depth in range(28, 33, 1):
+    #     for max_feat in tqdm(range(2750, 2900, 20)):
+    #         kscores = []
+    #         for train_ind, test_ind in kfold.split(Xtrain):
+    #             xtrain_cv = Xtrain[train_ind]
+    #             ytrain_cv = Ytrain[train_ind]
+
+    #             xtest_cv = Xtrain[test_ind]
+    #             ytest_cv = Ytrain[test_ind]
+
+    #             rf = RandomForestClassifier(max_depth = depth, max_features = max_feat)
+    #             rf.fit(xtrain_cv, ytrain_cv)
+    #             preds = rf.predict(xtest_cv)
+    #             kscores.append(accuracy(preds, ytest_cv))
+
+    #         score = np.mean(kscores)
+    #         if score > best_score:
+    #             best_score = score
+    #             best_depth = depth
+    #             best_num_features = max_feat
+    
+    # print("Best depth:", best_depth)
+    # print("Best features", best_num_features)
+    rf = RandomForestClassifier(max_features = 2750, max_depth = 28)
+    rf.fit(Xtrain, Ytrain)
+    preds = rf.predict(Xtest)
+    print("RF:",  accuracy(preds, Ytest))
+
+    rf = RandomForestClassifier()
+    rf.fit(Xtrain, Ytrain)
+    preds = rf.predict(Xtest)
+    print("RF:",  accuracy(preds, Ytest))
+
+    # nb = MultinomialNB(class_prior = [0.0369, 0.0162, 0.012, 0.0103, 0.0133, 0.0126, 0.0172, 0.0133, 0.5214, 0.0068, 0.1756, 0.0104, 0.1218, 0.0191, 0.0130])
+    # nb = MultinomialNB(class_prior = [1 for i in range(15)])
+    # nb = MultinomialNB(class_prior = [0.5] + [0.2] * 7 + [0.3] + [0.2] + [0.3] + [0.2] + [0.3] + [0.2] * 2) # Weight less common classes higher
+    nb = MultinomialNB()
+    nb.fit(Xtrain, Ytrain)
+    preds = nb.predict(Xtest)
+    print("NB:",  accuracy(preds, Ytest))
+
+    
+    # # NN CV: based on number neurons in one hidden layer
+    # # On 1000 rows, best number of nodes was 281
+    # print("Xtrain shape:", Xtrain.shape[1])
+    # best_num_nodes = None
+    # best_score = float("-inf")
+    # N = Xtrain.shape[0]
+    # kfold = KFold(n_splits = 5)
+
+    # for num_nodes in tqdm(range(1, (N * 2) // 3, 70)):
+    #     kscores = []
+    #     for train_ind, test_ind in kfold.split(Xtrain):
+    #         xtrain_cv = Xtrain[train_ind]
+    #         ytrain_cv = Ytrain[train_ind]
+
+    #         xtest_cv = Xtrain[test_ind]
+    #         ytest_cv = Ytrain[test_ind]
+
+    #         nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (num_nodes,))
+    #         nn.fit(xtrain_cv, ytrain_cv)
+    #         preds = nn.predict(xtest_cv)
+    #         kscores.append(accuracy(preds, ytest_cv))
+
+    #     score = np.mean(kscores)
+    #     if score > best_score:
+    #         best_num_nodes = num_nodes
+    #         best_score = score
+
+    # print("best num nodes:",  best_num_nodes)
+
+    
+    nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (281,))
+    nn.fit(Xtrain, Ytrain)
+    preds = nn.predict(Xtest)
+    print("NN:", accuracy(preds, Ytest))
+
+
+    # print X_train # Not currently a np.array, need to do .toarray()
+    # print global_feat_dict
 
     print "done extracting training features"
     print
     
     # TODO train here, and learn your classification parameters
     print "learning..."
-    
-    rf = RandomForestClassifier(max_features = 2750, max_depth = 28)
-    rf.fit(X_train.toarray(), t_train)
-    
-    # nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (281,))
-    # nn.fit(X_train.toarray(), t_train)
-
+    # learned_W = np.random.random((len(global_feat_dict),len(util.malware_classes)))
     print "done learning"
     print
     
-    # get rid of training data and load test data
-    del X_train
-    del t_train
-    del train_ids
+    # # get rid of training data and load test data
+    # del X_train
+    # del t_train
+    # del train_ids
     
-    print "extracting test features..."
-    X_test,_,t_ignore,test_ids = extract_feats(ffs, test_dir, global_feat_dict=global_feat_dict)
-    print "done extracting test features"
-    print
+    # print "extracting test features..."
+    # X_test,_,t_ignore,test_ids = extract_feats(ffs, test_dir, global_feat_dict=global_feat_dict)
+    # print "done extracting test features"
+    # print
     
-    # TODO make predictions on text data and write them out
-    print "making predictions..."
+    # # TODO make predictions on text data and write them out
+    # print "making predictions..."
+    # preds = np.argmax(X_test.dot(learned_W),axis=1)
+    # print "done making predictions"
+    # print
     
-    preds = rf.predict(X_test.toarray())
-    # preds = nn.predict(X_test.toarray())
-    
-    print "done making predictions"
-    print
-    
-    print "writing predictions..."
-    util.write_predictions(preds, test_ids, outputfile)
-    print "done!"
+    # print "writing predictions..."
+    # util.write_predictions(preds, test_ids, outputfile)
+    # print "done!"
 
 if __name__ == "__main__":
     main()
+    
