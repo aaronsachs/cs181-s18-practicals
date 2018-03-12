@@ -288,7 +288,9 @@ def quadgrams(tree):
             prev_prev_elt = None # Reset trigrams for new section
             prev_prev_prev_elt = None
         elif in_all_section:
-            if prev_prev_elt == None:
+            if prev_prev_prev_elt == None:
+                prev_prev_prev_elt = el.tag
+            elif prev_prev_elt == None:
                 prev_prev_elt = el.tag
             elif prev_elt == None:
                 prev_elt = el.tag
@@ -308,7 +310,8 @@ def main():
     
     # TODO put the names of the feature functions you've defined above in this list
     # ffs = [first_last_system_call_feats, system_call_count_feats, frequency]
-    ffs = [quadgrams]
+    #ffs = [quadgrams]
+    ffs = [first_last_system_call_feats, quadgrams]
     
     # extract features
     print "extracting training features..."
@@ -323,11 +326,14 @@ def main():
     # TODO train here, and learn your classification parameters
     print "learning..."
     
-    rf = RandomForestClassifier(max_features = 2750, max_depth = 28)
-    rf.fit(X_train.toarray(), t_train)
+    # rf = RandomForestClassifier(max_features = 2750, max_depth = 28)
+    # rf.fit(X_train.toarray(), t_train)
     
-    # nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (281,))
-    # nn.fit(X_train.toarray(), t_train)
+    nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (320,))
+    nn.fit(X_train.toarray(), t_train)
+
+    # rf = RandomForestClassifier(max_features = 100, max_depth = 90)
+    # rf.fit(X_train.toarray(), t_train)
 
     print "done learning"
     print
@@ -345,8 +351,8 @@ def main():
     # TODO make predictions on text data and write them out
     print "making predictions..."
     
-    preds = rf.predict(X_test.toarray())
-    # preds = nn.predict(X_test.toarray())
+    # preds = rf.predict(X_test.toarray())
+    preds = nn.predict(X_test.toarray())
     
     print "done making predictions"
     print

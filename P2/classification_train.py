@@ -354,7 +354,7 @@ def main():
     # TODO put the names of the feature functions you've defined above in this list
     # ffs = [first_last_system_call_feats, system_call_count_feats, frequency]
     # ffs = [bigrams, first_last_system_call_feats]
-    ffs = [first_last_system_call_feats, trigrams]
+    ffs = [first_last_system_call_feats, bigrams]
     
     # extract features
     print "extracting training features..."
@@ -379,8 +379,8 @@ def main():
     # # 10326 features, opt num feats was 2800.  Opt depth was 30
     # # 10326 features, opt num feats is 2750, opt depth is 28
 
-    # for depth in range(200, 260, 10):
-    #     for max_feat in tqdm(range(250, 350, 10)):
+    # for depth in range(240, 300, 10):
+    #     for max_feat in tqdm(range(20, 150, 10)):
     #         kscores = []
     #         for train_ind, test_ind in kfold.split(Xtrain):
     #             xtrain_cv = Xtrain[train_ind]
@@ -389,7 +389,7 @@ def main():
     #             xtest_cv = Xtrain[test_ind]
     #             ytest_cv = Ytrain[test_ind]
 
-    #             rf = RandomForestClassifier(max_depth = depth, max_features = max_feat)
+    #             rf = RandomForestClassifier(max_depth = 90, max_features = max_feat)
     #             rf.fit(xtrain_cv, ytrain_cv)
     #             preds = rf.predict(xtest_cv)
     #             kscores.append(accuracy(preds, ytest_cv))
@@ -402,12 +402,14 @@ def main():
     
     # print("Best depth:", best_depth)
     # print("Best features", best_num_features)
-    rf = RandomForestClassifier(max_features = 300, max_depth = 220)
-    rf.fit(Xtrain, Ytrain)
-    preds = rf.predict(Xtest)
-    print("RF:",  accuracy(preds, Ytest))
 
-    # rf = RandomForestClassifier()
+    for feat in range(20, 150, 10):
+        rf = RandomForestClassifier(max_features = feat, max_depth = 90)
+        rf.fit(Xtrain, Ytrain)
+        preds = rf.predict(Xtest)
+        print("RF {}:".format(feat),  accuracy(preds, Ytest))
+
+    # rf = RandomForestClassifier(max_features = best_num_features, max_depth = 90)
     # rf.fit(Xtrain, Ytrain)
     # preds = rf.predict(Xtest)
     # print("RF:",  accuracy(preds, Ytest))
@@ -423,12 +425,12 @@ def main():
     # NN CV: based on number neurons in one hidden layer
     # On 1000 rows, best number of nodes was 281
     print("Xtrain shape:", Xtrain.shape[1])
-    best_num_nodes = None
+    best_layer = None
     best_score = float("-inf")
     N = Xtrain.shape[0]
     kfold = KFold(n_splits = 5)
 
-    for num_nodes in tqdm(range(1, N // 2, 160)):
+    for layer in tqdm([(300, 100), (300, 300), (100, 50), (100, 100), (50, 50)]):
         kscores = []
         for train_ind, test_ind in kfold.split(Xtrain):
             xtrain_cv = Xtrain[train_ind]
@@ -437,19 +439,21 @@ def main():
             xtest_cv = Xtrain[test_ind]
             ytest_cv = Ytrain[test_ind]
 
-            nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (num_nodes,))
+            nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = layer)
             nn.fit(xtrain_cv, ytrain_cv)
             preds = nn.predict(xtest_cv)
             kscores.append(accuracy(preds, ytest_cv))
 
         score = np.mean(kscores)
+        print(score) 
+
         if score > best_score:
-            best_num_nodes = num_nodes
+            best_layer = layer
             best_score = score
 
-    print("best num nodes:",  best_num_nodes)
+    print("best num nodes:",  best_layer)
 
-    nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = (best_num_nodes,))
+    nn = MLPClassifier(max_iter = 10000, hidden_layer_sizes = best_layer)
     nn.fit(Xtrain, Ytrain)
     preds = nn.predict(Xtest)
     print("NN:", accuracy(preds, Ytest))
